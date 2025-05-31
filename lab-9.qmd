@@ -1,0 +1,276 @@
+---
+title: "lab-9"
+format: html
+editor: visual
+embed-resources: true
+warning: false
+author: Lucas Kantorowski
+---
+
+```{r}
+library(ggplot2)
+library(tibble)
+library(scales)
+library(ggthemes)
+library(dplyr)
+library(rayshader)
+library(tibble)
+library(ambient)
+```
+
+## Art Piece 1 Code
+
+```{r}
+#Danielle's provided function
+#sample_canva allows for custom color palettes
+sample_canva <- function(seed = NULL) {
+  if(!is.null(seed)) set.seed(seed)
+  sample(ggthemes::canva_palettes, 1)[[1]]
+}
+
+#samples n colors from canva color palette, interpolated between 2 color points
+sample_canva2 <- function(seed = NULL, n = 4) {
+  
+  if(!is.null(seed)) set.seed(seed)
+  sample(ggthemes::canva_palettes, 1)[[1]] |>
+    (\(x) colorRampPalette(x)(n))()  
+}
+
+```
+
+```{r}
+#Danielle's provided function
+#loading in sample data
+sample_data <- function(seed = NULL, n = 100){
+  if(!is.null(seed)) set.seed(seed) #setting seed
+  dat <- tibble(
+    x0 = runif(n),
+    y0 = runif(n),
+    x1 = x0 + runif(n, min = -.2, max = .2),
+    y1 = y0 + runif(n, min = -.2, max = .2),
+    shade = runif(n), 
+    size = runif(n),
+    shape = factor(sample(0:22, size = n, replace = TRUE))
+  )
+}
+
+```
+
+```{r}
+#Danielle's provided function
+#coord_polar() makes lines be defined by polar coordinates
+#theme_void() for no axis, legends, scales, etc.
+polar_styled_plot <- function(data = NULL, palette) {
+  ggplot(
+    data = data,
+    mapping = aes(
+      x = x0,
+      y = y0,
+      xend = x1,
+      yend = y1,
+      colour = shade,
+      size = size
+    )) + 
+    coord_polar(clip = "off") +
+    scale_y_continuous(
+      expand = c(0, 0),
+      limits = c(0, 1), 
+      oob = scales::oob_keep
+    ) +
+    scale_x_continuous(
+      expand = c(0, 0), 
+      limits = c(0, 1), 
+      oob = scales::oob_keep
+    ) + 
+    scale_colour_gradientn(colours = palette) + 
+    scale_size(range = c(0, 10)) + 
+    theme_void() + 
+    guides(
+      colour = guide_none(),
+      size = guide_none(),
+      fill = guide_none(),
+      shape = guide_none()
+    )
+}
+```
+
+
+```{r}
+#creating data set for the center
+dat1 <- sample_data(n = 100, seed = 23) |>
+  mutate(y0 = .3 - y0, y1 = .3)
+
+
+#creating data set for 'arms' reaching out
+dat2 <- sample_data(n = 30, seed = 48) |>  
+  mutate(y0 = .3 + y0 * .6, y1 = .3)
+
+#adding the blue color template to match the center
+dat2 = dat2 %>% mutate(colors = sample_canva2(n = 30, seed = 3))
+
+#creating data set for points on the outside
+#using sign() function to spread points out from the center
+dat3 <- sample_data(n = 500, seed = 475) |>  
+  mutate(y0 = y0 * 2 + sign(y0) * .8, y1 = y1 * 2 + sign(y1))
+
+#using a color palette with a wider range of colors
+dat3 = dat3 %>% mutate(colors = sample_canva2(n = 500, seed = 99))
+
+art1 = polar_styled_plot(palette = sample_canva(seed = 3)) + 
+  geom_jitter(
+    data = dat3 |> mutate(size = size * 2),
+    colour = dat3$colors #adding colored dots to the outside as 1st layer
+  ) + 
+  geom_segment(
+    data = dat1 |> mutate(size = size / 10)#created center out of small segments
+  ) +
+  geom_segment(
+    data = dat2 |> mutate(size = size / 5), #adding black border to 'arms'
+    lineend = "round", 
+    colour = "black"
+  )  +
+  geom_segment(
+    data = dat2 |> mutate(size = size / 10), #adding middle blue color to 'arms'
+    lineend = "round", 
+    colour = dat2$colors
+  ) +
+  geom_point(
+    data = dat2 |> mutate(size = size), #adding blacks dots to end of 'arms'
+    colour = 'black'
+  ) 
+
+```
+
+
+## The Void
+
+Nothing can escape the void's grasp! It consumes all, growing bigger and expanding its reach. All life force is extracted from those who are unfortunate enough to come face to face with it. The soft blue center emits an unsettling sense of calmness, antithetical to the chaos it causes.
+
+
+```{r}
+art1
+```
+
+
+There are 3 sets of data used in the above art piece. The first data set (dat1) created the center. The use of mutating 'y0 = .3 - y0' caused some segments to reach out beyond the radius of the circle, which is was inspired the idea behind the art piece. I felt 100 segments were the best for this part. The second data set (dat2) is the segments reaching out from the center circle, and are the same color as the sgments from the first data set. These are the segments with the black points at the end. Combining these with the segments of the first part created a sense of chaos, as some 'arms' have grabbed onto a colorful point on the outside, while some are in the process of doing so.
+
+The third set of data (dat3) is the colored points on the outside. The have larger coordinate values, and the sizes are generally larger than those of the second data set. I used a different Canva palette to create a contrast between the center and the outside. 500 points looked the best in my opinion. These points added a story, showing the process of what has happened, and is about to happen.
+
+
+## Art Piece 2 Code
+
+```{r}
+#Danielle's provided function
+#produce coordinates to give to other functions
+transform_to_curl_space <- function(x, y, frequency = 1, octaves = 10) {
+  curl_noise(
+    generator = fracture,
+    noise = gen_simplex,
+    fractal = fbm,
+    octaves = octaves,
+    frequency = frequency,
+    x = x,
+    y = y
+  )
+}
+```
+
+
+```{r}
+#Danielle's provided function
+#construct cells in the transformed space
+define_worley_cells <- function(x, y, frequency = 3, octaves = 6) {
+  fracture(
+    noise = gen_worley,
+    fractal = billow,
+    octaves = octaves,
+    frequency = frequency,
+    value = "cell",
+    x = x,
+    y = y
+  ) |>
+    rank() |> 
+    normalise()
+}
+```
+
+```{r}
+#Danielle's provided function
+#adding offsets to coordinates
+simplex_noise <- function(x, y, frequency = .1, octaves = 10) {
+  fracture(
+    noise = gen_simplex,
+    fractal = ridged,
+    octaves = octaves,
+    frequency = frequency,
+    x = x,
+    y = y
+  ) |>
+    normalise()
+}
+```
+
+```{r}
+#Danielle's provided function
+#constructing floe using above functions
+ice_floe <- function(seed) {
+  
+  set.seed(seed)
+  
+  grid <- long_grid(
+    x = seq(0, 1, length.out = 2000),
+    y = seq(0, 1, length.out = 2000)
+  )
+  
+  coords <- transform_to_curl_space(grid$x, grid$y)
+  
+  grid |>
+    mutate(
+      cells = define_worley_cells(coords$x, coords$y),
+      paint = simplex_noise(x + cells, y + cells),
+      paint = normalise(paint)
+    ) |>
+    as.array(value = paint)
+}
+```
+
+
+```{r}
+#Danielle's provided function
+#Adding shading to create a 3D effect
+shaded_ice_floe <- function(seed) {
+  
+  art <- ice_floe(668)
+  
+  height_shade(
+    heightmap = art,
+    texture = sample_canva2(seed, n=10)
+  ) |>
+    add_shadow(
+      shadowmap = ray_shade(
+        heightmap = art, 
+        sunaltitude = 40, 
+        sunangle = 195,
+        multicore = TRUE, 
+        zscale = .005
+      ), 
+      max_darken = .3
+    ) |>
+    plot_map()
+}
+```
+
+
+
+
+## Topo-Illogical
+
+Heat maps create an understanding of the domain of presentation. Shadows serve a similar purpose. When the two are combined in illogical ways, a sense of understanding is diminished. You may choose to listen to the colors, or you may choose to listen to the shadows. The choice is yours.
+
+
+```{r}
+shaded_ice_floe(8)
+```
+
+
+The main part of creating the above art piece is finding a good combination of color palette, generated terrain, and sun angle. Certain terrains go well with certain color palettes and vice versa. I eventually settled on Canva palette seed 8, as it featured colors that reminded me of heat maps. Ice floe seed 668 created a combination with the chosen color palette that created no sense of topological understanding to me. I chose to increase the sun altitude to 40, as I wanted to convey a starker color contrast between the darker colors and lighter colors. The sun angle of 195 added to the overall goal of the piece.
